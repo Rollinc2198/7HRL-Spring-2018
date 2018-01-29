@@ -18,9 +18,10 @@ def collisionCheck(x1, x2, y1, y2, w1, w2, h1, h2):
 
 #player shit
 class Player(pygame.sprite.Sprite):
+    
     def __init__(self, x, y, color, moveset):
         pygame.sprite.Sprite.__init__(self)
-        self.w = self.h = 50
+        self.w = self.h = 60
         self.image = pygame.Surface((self.w, self.h))
         self.color = color
         self.image.fill(color)
@@ -28,9 +29,10 @@ class Player(pygame.sprite.Sprite):
         self.x = x
         self.y = y
         self.vx = self.vy = 0
-        self.vel = 3
+        self.vel = 2
         self.moveset = moveset
         self.isLeft = self.isRight = self.isUp = self.isDown = False
+        self.isAlive = True
 
     def onKeyDown(self, event):
         if event.key == self.moveset[0]: self.isLeft  = True
@@ -44,33 +46,40 @@ class Player(pygame.sprite.Sprite):
         if event.key == self.moveset[2]: self.isUp    = False
         if event.key == self.moveset[3]: self.isDown  = False
 
+    def death(self):
+        self.isAlive = False
+
     def update(self):
         self.vx = (-self.vel if self.isLeft else 0) + (self.vel if self.isRight else 0)
         self.vy = (-self.vel if self.isUp   else 0) + (self.vel if self.isDown  else 0)
 
+        #right
         if self.vx > 0:
             for obj in objList:
                 if not obj == self:
                     if self.x + self.vx + self.w > obj.x and self.x + self.vx < obj.x + obj.w and self.y < obj.y + obj.h and self.y + self.h > obj.y:
-                        self.vx = obj.x - (self.x + self.w)
+                        if isinstance(obj, Wall) or isinstance(obj, Player): self.vx = obj.x - (self.x + self.w)
                         break
+        #left
         if self.vx < 0:
             for obj in objList:
                 if not obj == self:
                     if self.x + self.vx < obj.x + obj.w and self.x + self.vx + self.w > obj.x and self.y < obj.y + obj.h and self.y + self.h > obj.y:
-                        self.vx = self.x - (obj.x + obj.w)
+                        if isinstance(obj, Wall) or isinstance(obj, Player): self.vx = self.x - (obj.x + obj.w)
                         break
+        #down
         if self.vy > 0:
             for obj in objList:
                 if not obj == self:
                     if self.y + self.vy + self.h > obj.y and self.y + self.vy < obj.y + obj.h and self.x < obj.x + obj.w and self.x + self.w > obj.x:
-                        self.vy = obj.y - (self.y + self.h)
+                        if isinstance(obj, Wall) or isinstance(obj, Player): self.vy = obj.y - (self.y + self.h)
                         break
+        #up
         if self.vy < 0:
             for obj in objList:
                 if not obj == self:
                     if self.y + self.vy < obj.y + obj.h and self.y + self.vy + self.h > obj.y and self.x < obj.x + obj.w and self.x + self.w > obj.x:
-                        self.vy = self.y - (obj.y + obj.h)
+                        if isinstance(obj, Wall) or isinstance(obj, Player): self.vy = self.y - (obj.y + obj.h)
                         break
 
         self.x += self.vx
@@ -78,6 +87,7 @@ class Player(pygame.sprite.Sprite):
 
 #enemy shit
 class Enemy(pygame.sprite.Sprite):
+
     def __init__(self, x, y, player1, player2):
         pygame.sprite.Sprite.__init__(self)
         self.w = self.h = 40
@@ -87,40 +97,65 @@ class Enemy(pygame.sprite.Sprite):
         self.x = x
         self.y = y
         self.vx = self.vy = 0
-        self.vel = 2
+        self.vel = 1
         self.target1 = player1
         self.target2 = player2
 
     def update(self):
-        #self.vx = (-self.vel if self.isLeft else 0) + (self.vel if self.isRight else 0)
-        #self.vy = (-self.vel if self.isUp else 0) + (self.vel if self.isDown else 0)
+        centerSelfx = self.x + self.w/2
+        centerSelfy = self.y + self.h/2
+        center1x = self.target1.x + self.target1.w/2
+        center1y = self.target1.y + self.target1.h/2
+        center2x = self.target2.x + self.target2.w/2
+        center2y = self.target2.y + self.target2.h/2
 
-        dist1 = abs(((((self.x + self.w/2) - (self.target1.x + self.target1.w))**(2)) + (((self.y + self.h/2) - (self.target1.y + self.target1.h))**(2)))**(1/2))
-        dist2 = abs(((((self.x + self.w/2) - (self.target2.x + self.target2.w))**(2)) + (((self.y + self.h/2) - (self.target2.y + self.target2.h))**(2)))**(1/2))
+        dist1 = ((centerSelfx - center1x)**(2) + (centerSelfy - center1y)**(2))**(1/2)
+        dist2 = ((centerSelfx - center2x)**(2) + (centerSelfy - center2y)**(2))**(1/2)
 
+        if   not self.target1.isAlive: target = self.target2
+        elif not self.target2.isAlive: target = self.target1
+        else: target = self.target1 if dist1 < dist2 else self.target2
+        centerx = target.x + target.w / 2
+        centery = target.y + target.h / 2
+
+        if centerx - centerSelfx < 0: self.vx = -self.vel
+        if centerx - centerSelfx > 0: self.vx = self.vel
+        if centery - centerSelfy < 0: self.vy = -self.vel
+        if centery - centerSelfy > 0: self.vy = self.vel
+        if centerx - centerSelfx == 0: self.vx = 0
+        if centery - centerSelfy == 0: self.vy = 0
+
+        # right
         if self.vx > 0:
             for obj in objList:
                 if not obj == self:
                     if self.x + self.vx + self.w > obj.x and self.x + self.vx < obj.x + obj.w and self.y < obj.y + obj.h and self.y + self.h > obj.y:
-                        self.vx = obj.x - (self.x + self.w)
+                        if isinstance(obj, Wall) or isinstance(obj, Enemy): self.vx = obj.x - (self.x + self.w)
+                        if isinstance(obj, Player): obj.death()
                         break
+        # left
         if self.vx < 0:
             for obj in objList:
                 if not obj == self:
                     if self.x + self.vx < obj.x + obj.w and self.x + self.vx + self.w > obj.x and self.y < obj.y + obj.h and self.y + self.h > obj.y:
-                        self.vx = self.x - (obj.x + obj.w)
+                        if isinstance(obj, Wall) or isinstance(obj, Enemy): self.vx = self.x - (obj.x + obj.w)
+                        if isinstance(obj, Player): obj.death()
                         break
+        # down
         if self.vy > 0:
             for obj in objList:
                 if not obj == self:
                     if self.y + self.vy + self.h > obj.y and self.y + self.vy < obj.y + obj.h and self.x < obj.x + obj.w and self.x + self.w > obj.x:
-                        self.vy = obj.y - (self.y + self.h)
+                        if isinstance(obj, Wall) or isinstance(obj, Enemy): self.vy = obj.y - (self.y + self.h)
+                        if isinstance(obj, Player): obj.death()
                         break
+        # up
         if self.vy < 0:
             for obj in objList:
                 if not obj == self:
                     if self.y + self.vy < obj.y + obj.h and self.y + self.vy + self.h > obj.y and self.x < obj.x + obj.w and self.x + self.w > obj.x:
-                        self.vy = self.y - (obj.y + obj.h)
+                        if isinstance(obj, Wall) or isinstance(obj, Enemy): self.vy = self.y - (obj.y + obj.h)
+                        if isinstance(obj, Player): obj.death()
                         break
 
         self.x += self.vx
@@ -146,12 +181,13 @@ wallList = [
 ]
 enemyList = []
 for i in range(0, 3):
-    enemyList.append(Enemy(1920/2, 1080/2, player1, player2))
+    enemyList.append(Enemy(1920/2-20, 1080/2-20, player1, player2))
 
 objList = []
 objList.append(player1)
 objList.append(player2)
 objList.extend(wallList)
+objList.extend(enemyList)
 
 allsprites = pygame.sprite.Group()
 allsprites.add(player1)
@@ -168,14 +204,14 @@ while True:
             pygame.quit()
             sys.exit()
         if event.type == pygame.KEYDOWN:
-            player1.onKeyDown(event)
-            player2.onKeyDown(event)
+            if player1.isAlive: player1.onKeyDown(event)
+            if player2.isAlive: player2.onKeyDown(event)
         if event.type == pygame.KEYUP:
-            player1.onKeyUp(event)
-            player2.onKeyUp(event)
+            if player1.isAlive: player1.onKeyUp(event)
+            if player2.isAlive: player2.onKeyUp(event)
 
-    player1.update()
-    player2.update()
+    if player1.isAlive: player1.update()
+    if player2.isAlive: player2.update()
 
     #draw shit
     screen.fill(black)
@@ -184,8 +220,8 @@ while True:
     for enemy in enemyList:
         enemy.update()
         screen.blit(enemy.image, (enemy.x, enemy.y))
-    screen.blit(player1.image, (player1.x, player1.y))
-    screen.blit(player2.image, (player2.x, player2.y))
+    if player1.isAlive: screen.blit(player1.image, (player1.x, player1.y))
+    if player2.isAlive: screen.blit(player2.image, (player2.x, player2.y))
 
     #update shit
     allsprites.update()
